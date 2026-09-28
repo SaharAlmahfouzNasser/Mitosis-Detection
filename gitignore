@@ -1,0 +1,21 @@
+# Data and outputs (may contain patient-derived images)
+data/
+outputs/
+
+# Model weights
+weights/
+*.pt
+*.pth
+*.onnx
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# OS / editor
+.DS_Store
+.ipynb_checkpoints/
+.vscode/
+.idea/

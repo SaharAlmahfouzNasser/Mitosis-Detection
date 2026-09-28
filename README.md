@@ -30,9 +30,9 @@ flowchart LR
 2. **Patch extraction** — the normalized image is tiled into non-overlapping **256 × 256** patches. Edge patches are padded to full size. The top-left `(x, y)` of each patch is stored in a JSON file for later reconstruction.
 3. **Parallel & resumable** — case folders are processed in parallel using all CPU cores (`multiprocessing.Pool`), and images that already have a `Patches/` directory are skipped.
 
-### Stage 2 — Detection & Reconstruction (`ACS_Mitosis_Pred_recon_new.py`)
+### Stage 2 — Detection & Reconstruction (`mitosis_detection.py`)
 
-1. Runs a trained **YOLO** model (`ultralytics`) on every patch.
+1. Runs a trained **YOLOv8** model (`ultralytics`) on every patch.
 2. Keeps detections of **class index 1** (mitotic figure) and draws them in green on the patch.
 3. Converts patch-level boxes to **whole-image coordinates** using the stored patch offsets.
 4. Writes one **CSV of bounding boxes** per image.
@@ -45,10 +45,13 @@ flowchart LR
 ```
 .
 ├── preprocessing.py                  # Stain normalization + patch extraction
-├── ACS_Mitosis_Pred_recon_new.py     # YOLO inference, CSV export, image reconstruction
+├── mitosis_detection.py              # YOLOv8 inference, CSV export, image reconstruction
 ├── assets/
 │   └── 001_patch_200_4000.png        # Stain-normalization target (MIDOG)
+├── data/                             # Your images (not tracked by git)
+├── weights/                          # Your trained model (not tracked by git)
 ├── requirements.txt
+├── .gitignore
 └── README.md
 ```
 
@@ -73,20 +76,13 @@ tiatoolbox
 ultralytics
 opencv-python
 pillow
-matplotlib
-scikit-image
-requests
 ```
 
 > `tiatoolbox` may require system libraries such as OpenSlide. See the [tiatoolbox installation guide](https://tia-toolbox.readthedocs.io/en/latest/installation.html).
 
 ### Model weights
 
-The trained detector weights (`best.pt`) are **not included** in this repository. Place your weights file somewhere accessible and update the path in `ACS_Mitosis_Pred_recon_new.py`:
-
-```python
-model = YOLO('path/to/best.pt')
-```
+The trained detector weights (`best.pt`) are **not included** in this repository. Place them at `weights/best.pt`, or pass another location with `--weights`.
 
 ---
 
@@ -95,7 +91,7 @@ model = YOLO('path/to/best.pt')
 The preprocessing script expects one folder per case, each containing tumor image tiles:
 
 ```
-TMC_new/
+data/raw/
 ├── <case_1>/
 │   └── tumor/
 │       └── images/
@@ -111,33 +107,41 @@ Supported formats: `.png`, `.jpg`, `.jpeg`.
 
 ---
 
-## Configuration
-
-Paths are currently set as constants inside the scripts. Update them to match your environment before running:
-
-| Script | Variable | Purpose |
-|---|---|---|
-| `preprocessing.py` | `path_all` | Root folder containing the case folders |
-| `preprocessing.py` | `target_image` | Stain-normalization target (e.g. `assets/001_patch_200_4000.png`) |
-| `preprocessing.py` | `save_dir` / `patches_dir` | Output folder for normalized images and patches |
-| `preprocessing.py` | `patch_size` | Patch size in pixels (default `256`) |
-| `ACS_Mitosis_Pred_recon_new.py` | `model` path | YOLO weights (`best.pt`) |
-| `ACS_Mitosis_Pred_recon_new.py` | `root_dir` | Output folder of the preprocessing step |
-| `ACS_Mitosis_Pred_recon_new.py` | `output_base` | Where CSVs and reconstructed images are written |
-
-> **Note:** `path_all` appears in two functions in `preprocessing.py`, and the output path appears in both `is_processed` and `stain_norm`. Keep them consistent.
-
----
-
 ## Usage
+
+Both scripts run with sensible defaults, so with the layout above you only need:
 
 ```bash
 # 1. Normalize and tile all images
 python preprocessing.py
 
 # 2. Detect mitoses, export coordinates, and reconstruct annotated images
-python ACS_Mitosis_Pred_recon_new.py
+python mitosis_detection.py
 ```
+
+All paths and settings can be overridden from the command line:
+
+| Script | Argument | Default | Purpose |
+|---|---|---|---|
+| `preprocessing.py` | `--input-root` | `data/raw` | Folder containing one subfolder per case |
+| `preprocessing.py` | `--output-root` | `data/preprocessed` | Normalized images, patches and patch JSONs |
+| `preprocessing.py` | `--target-image` | `assets/001_patch_200_4000.png` | Stain-normalization reference |
+| `preprocessing.py` | `--patch-size` | `256` | Patch size in pixels |
+| `preprocessing.py` | `--workers` | all CPU cores | Number of parallel processes |
+| `mitosis_detection.py` | `--weights` | `weights/best.pt` | Trained YOLOv8 weights |
+| `mitosis_detection.py` | `--input-root` | `data/preprocessed` | Output folder of `preprocessing.py` |
+| `mitosis_detection.py` | `--output-root` | `outputs` | CSVs and reconstructed images |
+| `mitosis_detection.py` | `--class-id` | `1` | Class index of mitotic figures |
+| `mitosis_detection.py` | `--conf` | `0.25` | Detection confidence threshold |
+
+Example with custom paths:
+
+```bash
+python preprocessing.py --input-root /path/to/dataset --output-root /path/to/preprocessed
+python mitosis_detection.py --input-root /path/to/preprocessed --weights /path/to/best.pt --conf 0.4
+```
+
+Run `python <script>.py --help` for the full list.
 
 ---
 
@@ -146,7 +150,7 @@ python ACS_Mitosis_Pred_recon_new.py
 **After preprocessing**
 
 ```
-PreProcessing/
+data/preprocessed/
 └── <case>/tumor/images/<image_name>/
     ├── <image_name>.png                  # Stain-normalized image
     ├── patches_info_<image_name>.json    # Patch names and (x, y) offsets
@@ -158,19 +162,19 @@ PreProcessing/
 
 ```json
 [
-    {"patch_name": "patch_0", "x": 0,   "y": 0},
-    {"patch_name": "patch_1", "x": 256, "y": 0}
+    {"patch_name": "patch_0.png", "x": 0,   "y": 0},
+    {"patch_name": "patch_1.png", "x": 256, "y": 0}
 ]
 ```
 
 **After detection**
 
 ```
-TMC_new_Final_Outputs/
-├── Final_Output/
-│   └── <case>/<image_name>.csv                        # Mitosis bounding boxes
-└── Outputs/
-    └── <case>/img_<image_name>_norm_reconstructed.png # Full annotated image
+outputs/
+├── bboxes/
+│   └── <case>/<image_name>.csv                     # Mitosis bounding boxes
+└── reconstructed/
+    └── <case>/<image_name>_reconstructed.png       # Full annotated image
 ```
 
 CSV format (pixel coordinates in the normalized full image):
@@ -186,8 +190,8 @@ CSV format (pixel coordinates in the normalized full image):
 ## Notes & Limitations
 
 - Patches are **non-overlapping**, so a mitotic figure lying on a patch border may be split or missed. Overlapping tiling with box merging (e.g. NMS) would address this.
-- Only class `1` is exported; adjust the class filter if your model uses a different label mapping.
-- Detection uses the Ultralytics default confidence threshold. Pass `conf=` to `model(...)` to tune it.
+- Only class `1` is exported by default; use `--class-id` if your model uses a different label mapping.
+- Tune the detection threshold with `--conf`.
 
 ---
 
@@ -211,9 +215,9 @@ If you use this work in your research, please cite:
 
 ```bibtex
 @misc{your_name_2026_mitosis,
-  author = {Sahar Almahfouz Nasser},
+  author = {Your Name},
   title  = {Mitotic Figure Detection in H\&E Tumor Images},
   year   = {2026},
-  url    = {https://github.com/SaharAlmahfouzNasser/Mitosis-Detection.git}
+  url    = {https://github.com/<your-username>/<your-repo>}
 }
 ```

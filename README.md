@@ -214,6 +214,6 @@ If you use this work in your research, please cite:
   author = {Sahar Almahfouz Nasser},
   title  = {Mitotic Figure Detection in H\&E Tumor Images},
   year   = {2026},
-  url    = {https://github.com/<your-username>/<your-repo>}
+  url    = {https://github.com/SaharAlmahfouzNasser/Mitosis-Detection.git}
 }
 ```

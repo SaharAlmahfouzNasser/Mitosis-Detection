@@ -82,7 +82,7 @@ pillow
 
 ### Model weights
 
-The trained detector weights (`best.pt`) are **not included** in this repository. Place them at `weights/best.pt`, or pass another location with `--weights`.
+The trained detector weights (`best.pt`) are **included** in this repository. Place them at `weights/best.pt`, or pass another location with `--weights`.
 
 ---
 

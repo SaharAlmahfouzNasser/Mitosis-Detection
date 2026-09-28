@@ -214,10 +214,10 @@ The detector is built on [Ultralytics YOLOv8](https://github.com/ultralytics/ult
 If you use this work in your research, please cite:
 
 ```bibtex
-@misc{your_name_2026_mitosis,
-  author = {Your Name},
+@misc{sahar_almahfouz_nasser_2026_mitosi,
+  author = {Sahar Almahfouz Nasser},
   title  = {Mitotic Figure Detection in H\&E Tumor Images},
   year   = {2026},
-  url    = {https://github.com/<your-username>/<your-repo>}
+  url    = {https://github.com/SaharAlmahfouzNasser/Mitosis-Detection.git}
 }
 ```
